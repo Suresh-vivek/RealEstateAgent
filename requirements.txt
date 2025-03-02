@@ -1,0 +1,8 @@
+agno
+firecrawl-py==1.9.0
+pydantic
+flask
+python-dotenv
+openai
+aiohttp
+requests
