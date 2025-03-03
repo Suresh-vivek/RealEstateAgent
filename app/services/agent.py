@@ -10,6 +10,7 @@ import json
 from dotenv import load_dotenv
 import logging
 import requests
+import openai
 
 
 # Load environment variables
@@ -326,7 +327,7 @@ class PropertyFindingAgent:
 
 
 def generate_response(message_body):
-            """Generates a response for property search queries."""
+            """Generates a response for property search queries or general messages."""
             try:            
                 # Get API keys from environment variables
                 firecrawl_key = os.getenv("FIRECRAWL_API_KEY")
@@ -335,7 +336,38 @@ def generate_response(message_body):
 
                 if not firecrawl_key or not openai_key:
                             return "❌ Error: Missing API keys. Please set FIRECRAWL_API_KEY and OPENAI_API_KEY in your .env file."
-        
+                
+                if not message_body:
+                            return "❌ Please provide a search query!"
+                        
+                # Step 1: Use OpenAI to classify the message
+                openai.api_key = openai_key
+                classification_prompt = f"""
+                Classify the following message as either 'general' (like greetings, small talk, or casual conversation) 
+                or 'property_search' (if it's a request related to real estate, property search, or location trends).
+
+                Message: "{message_body}"
+                Response (only 'general' or 'property_search' as output):"""
+                
+                response = openai.ChatCompletion.create(
+                model=model_id,
+                messages=[{"role": "system", "content": classification_prompt}],
+                temperature=0
+                )
+                
+                category = response["choices"][0]["message"]["content"].strip().lower()
+                
+                # Step 2: Handle general messages using OpenAI directly
+                if category == "general":
+                            general_response = openai.ChatCompletion.create(
+                                model=model_id,
+                                messages=[
+                                    {"role": "system", "content": "You're a helpful assistant."},
+                                    {"role": "user", "content": message_body}
+                                ]
+                            )
+                            return general_response["choices"][0]["message"]["content"]
+                
                 # Create the property agent
                 property_agent = PropertyFindingAgent(
                     firecrawl_api_key=firecrawl_key,
@@ -343,8 +375,7 @@ def generate_response(message_body):
                     model_id=model_id
                 )
         
-                if not message_body:
-                            return "❌ Please provide a search query!"
+                
         
                 # Interpret the user's query
                 params = property_agent.interpret_user_query(message_body)
